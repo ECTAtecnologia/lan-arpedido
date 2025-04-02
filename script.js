@@ -1,174 +1,34 @@
-// Variável global para manter a conexão com a impressora
-let printerConnection = {
-    device: null,
-    server: null,
-    characteristic: null
-};
-
-window.onload = function() {
-    // Máscara para telefone
-    var telefoneInput = document.getElementById('telefone');
-    VMasker(telefoneInput).maskPattern('(99) 99999-9999');
-
-    // Máscara para valor em reais
-    var valorInput = document.getElementById('valor');
-    VMasker(valorInput).maskMoney({
-        precision: 2,
-        separator: ',',
-        delimiter: '.',
-        unit: 'R$ '
-    });
-
-    // Carrega o nome do estabelecimento se existir
-    const savedName = localStorage.getItem('establishmentName');
-    if (savedName) {
-        document.getElementById('establishment-name').value = savedName;
-        document.getElementById('establishment-form').innerHTML = `
-            <div class="establishment-header">
-                <h2 style="font-size: 1rem;">Estabelecimento: ${savedName}</h2>
-                <button onclick="resetEstablishmentName()" class="btn btn-sm btn-secondary" style="font-size: 0.8rem;">Alterar</button>
-            </div>
-        `;
-    }
-
-    // Verifica disponibilidade do Bluetooth
-    checkBluetoothAvailability().then(available => {
-        if (!available) {
-            console.log('Bluetooth não está disponível');
-        }
-    });
-}
-
-function openModal() {
-    document.getElementById('pedidoModal').style.display = 'block';
-    document.body.style.overflow = 'hidden';
-}
-
-function closeModal() {
-    document.getElementById('pedidoModal').style.display = 'none';
-    document.body.style.overflow = 'auto';
-}
-
-// Fecha o modal se clicar fora dele
-window.onclick = function(event) {
-    const modal = document.getElementById('pedidoModal');
-    if (event.target == modal) {
-        closeModal();
-    }
-}
-
-function saveEstablishmentName() {
-    const input = document.getElementById('establishment-name');
-    const name = input.value.trim();
-    
-    if (name) {
-        localStorage.setItem('establishmentName', name);
-        document.getElementById('establishment-form').innerHTML = `
-            <div class="establishment-header">
-                <h2 style="font-size: 1rem;">Estabelecimento: ${name}</h2>
-                <button onclick="resetEstablishmentName()" class="btn btn-sm btn-secondary" style="font-size: 0.8rem;">Alterar</button>
-            </div>
-        `;
-    } else {
-        alert('Por favor, digite um nome válido');
-    }
-}
-
-function resetEstablishmentName() {
-    localStorage.removeItem('establishmentName');
-    location.reload();
-}
-
-// Função para verificar se o Bluetooth está disponível
-async function checkBluetoothAvailability() {
-    try {
-        const available = await navigator.bluetooth.getAvailability();
-        return available;
-    } catch (error) {
-        console.error('Erro ao verificar Bluetooth:', error);
-        return false;
-    }
-}
-
 // Função para conectar à impressora
 async function connectPrinter() {
     try {
-        // Se já temos uma conexão ativa, tenta usá-la
-        if (printerConnection.characteristic && 
-            printerConnection.device && 
-            printerConnection.device.gatt.connected) {
-            return printerConnection.characteristic;
-        }
-
-        // Se temos um dispositivo mas a conexão caiu, tenta reconectar
-        if (printerConnection.device) {
-            try {
-                const server = await printerConnection.device.gatt.connect();
-                const services = await server.getPrimaryServices();
-                for (const service of services) {
-                    const characteristics = await service.getCharacteristics();
-                    for (const char of characteristics) {
-                        if (char.properties.writeWithoutResponse || char.properties.write) {
-                            printerConnection.server = server;
-                            printerConnection.characteristic = char;
-                            return char;
-                        }
-                    }
-                }
-            } catch (reconnectError) {
-                console.log('Falha na reconexão, iniciando nova conexão');
-                printerConnection = { device: null, server: null, characteristic: null };
-            }
-        }
-
-        // Se não temos conexão ou a reconexão falhou, faz nova conexão
         const device = await navigator.bluetooth.requestDevice({
             filters: [
-                { namePrefix: 'MTP' },
-                { namePrefix: 'Printer' },
-                { namePrefix: 'ESP' },
-                { namePrefix: 'BT' }
+                { namePrefix: 'MTP' }
             ],
-            optionalServices: ['1812', '1811', '1801', '180a', '180f']
+            optionalServices: [
+                '49535343-FE7D-4AE5-8FA9-9FAFD205E455',
+                '49535343-8841-43F4-A8D4-ECBE34729BB3',
+                'E7810A71-73AE-499D-8C15-FAA9AEF0C3F2'
+            ]
         });
+
+        console.log('Dispositivo encontrado:', device.name);
 
         const server = await device.gatt.connect();
-        const services = await server.getPrimaryServices();
-        let characteristic;
+        console.log('Conectado ao servidor GATT');
 
-        for (const service of services) {
+        // Tenta o primeiro serviço
+        try {
+            const service = await server.getPrimaryService('49535343-FE7D-4AE5-8FA9-9FAFD205E455');
+            const characteristic = await service.getCharacteristic('49535343-8841-43F4-A8D4-ECBE34729BB3');
+            return characteristic;
+        } catch (e) {
+            console.log('Tentando serviço alternativo...');
+            // Tenta o segundo serviço
+            const service = await server.getPrimaryService('E7810A71-73AE-499D-8C15-FAA9AEF0C3F2');
             const characteristics = await service.getCharacteristics();
-            for (const char of characteristics) {
-                if (char.properties.writeWithoutResponse || char.properties.write) {
-                    characteristic = char;
-                    break;
-                }
-            }
-            if (characteristic) break;
+            return characteristics[0];
         }
-
-        if (!characteristic) {
-            throw new Error('Característica de impressão não encontrada');
-        }
-
-        // Armazena a conexão
-        printerConnection = {
-            device: device,
-            server: server,
-            characteristic: characteristic
-        };
-
-        // Adiciona listener para quando a conexão cair
-        device.addEventListener('gattserverdisconnected', async () => {
-            console.log('Conexão Bluetooth perdida, tentando reconectar...');
-            try {
-                await connectPrinter();
-            } catch (error) {
-                console.error('Falha na reconexão automática:', error);
-            }
-        });
-
-        return characteristic;
     } catch (error) {
         console.error('Erro ao conectar com a impressora:', error);
         throw error;
@@ -193,12 +53,6 @@ async function imprimirPedido() {
     }
 
     try {
-        // Verifica se o Bluetooth está disponível
-        const bluetoothAvailable = await checkBluetoothAvailability();
-        if (!bluetoothAvailable) {
-            throw new Error('Bluetooth não está disponível');
-        }
-
         // Limpa o formulário após validação
         limparFormulario();
 
@@ -222,12 +76,21 @@ async function imprimirPedido() {
             "\x1B\x61\x01" +      // Center alignment
             "=================\n" +
             `${new Date().toLocaleString()}\n` +
-            "\x1B\x64\x02";       // Feed 2 lines
+            "\x1B\x64\x02" +      // Feed 2 lines
+            "\x1D\x56\x41\x00";   // Cut paper
 
         // Converte o texto em bytes e envia para a impressora
         const encoder = new TextEncoder();
         const bytes = encoder.encode(textoImpressao);
-        await characteristic.writeValue(bytes);
+        
+        // Tenta enviar em chunks menores se necessário
+        const CHUNK_SIZE = 20;
+        for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+            const chunk = bytes.slice(i, i + CHUNK_SIZE);
+            await characteristic.writeValue(chunk);
+            // Pequeno delay entre os chunks
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
 
         // Envia o email
         const mensagemEmail = `
@@ -251,15 +114,4 @@ Data: ${new Date().toLocaleString()}
         console.error("Erro:", error);
         alert('Erro ao tentar imprimir. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima');
     }
-}
-
-function limparFormulario() {
-    document.getElementById('nome').value = '';
-    document.getElementById('telefone').value = '';
-    document.getElementById('produtos').value = '';
-    document.getElementById('pagamento').value = '';
-    document.getElementById('endereco').value = '';
-    document.getElementById('valor').value = '';
-    document.getElementById('nome').focus();
-    closeModal();
 }

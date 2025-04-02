@@ -1,3 +1,10 @@
+// Variável global para manter a conexão com a impressora
+let printerConnection = {
+    device: null,
+    server: null,
+    characteristic: null
+};
+
 window.onload = function() {
     // Máscara para telefone
     var telefoneInput = document.getElementById('telefone');
@@ -23,6 +30,13 @@ window.onload = function() {
             </div>
         `;
     }
+
+    // Verifica disponibilidade do Bluetooth
+    checkBluetoothAvailability().then(available => {
+        if (!available) {
+            console.log('Bluetooth não está disponível');
+        }
+    });
 }
 
 function openModal() {
@@ -65,59 +79,94 @@ function resetEstablishmentName() {
     location.reload();
 }
 
-// Função para salvar ID da impressora
-function savePrinterDevice(deviceId) {
-    localStorage.setItem('lastPrinterDevice', deviceId);
-}
-
-// Função para esquecer impressora pareada
-function forgetPrinter() {
-    localStorage.removeItem('lastPrinterDevice');
-    alert('Configuração da impressora removida. Na próxima impressão será necessário parear novamente.');
-}
-
-// Função auxiliar para converter texto em bytes para impressora
-function textToBytes(text) {
-    const encoder = new TextEncoder();
-    return encoder.encode(text);
+// Função para verificar se o Bluetooth está disponível
+async function checkBluetoothAvailability() {
+    try {
+        const available = await navigator.bluetooth.getAvailability();
+        return available;
+    } catch (error) {
+        console.error('Erro ao verificar Bluetooth:', error);
+        return false;
+    }
 }
 
 // Função para conectar à impressora
 async function connectPrinter() {
     try {
-        let device;
-        const lastDeviceId = localStorage.getItem('lastPrinterDevice');
+        // Se já temos uma conexão ativa, tenta usá-la
+        if (printerConnection.characteristic && 
+            printerConnection.device && 
+            printerConnection.device.gatt.connected) {
+            return printerConnection.characteristic;
+        }
 
-        if (lastDeviceId) {
+        // Se temos um dispositivo mas a conexão caiu, tenta reconectar
+        if (printerConnection.device) {
             try {
-                // Tenta reconectar ao último dispositivo usado
-                device = await navigator.bluetooth.getDevices()
-                    .then(devices => devices.find(d => d.id === lastDeviceId));
-            } catch (e) {
-                console.log('Não foi possível reconectar automaticamente:', e);
+                const server = await printerConnection.device.gatt.connect();
+                const services = await server.getPrimaryServices();
+                for (const service of services) {
+                    const characteristics = await service.getCharacteristics();
+                    for (const char of characteristics) {
+                        if (char.properties.writeWithoutResponse || char.properties.write) {
+                            printerConnection.server = server;
+                            printerConnection.characteristic = char;
+                            return char;
+                        }
+                    }
+                }
+            } catch (reconnectError) {
+                console.log('Falha na reconexão, iniciando nova conexão');
+                printerConnection = { device: null, server: null, characteristic: null };
             }
         }
 
-        if (!device) {
-            // Se não encontrou dispositivo salvo ou falhou reconexão, solicita novo pareamento
-            device = await navigator.bluetooth.requestDevice({
-                filters: [
-                    { namePrefix: 'Printer' },
-                    { namePrefix: 'ESP' },
-                    { namePrefix: 'BT' },
-                    { namePrefix: 'MTP' },
-                    { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
-                ],
-                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-            });
-            
-            // Salva o ID do novo dispositivo
-            savePrinterDevice(device.id);
-        }
+        // Se não temos conexão ou a reconexão falhou, faz nova conexão
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [
+                { namePrefix: 'MTP' },
+                { namePrefix: 'Printer' },
+                { namePrefix: 'ESP' },
+                { namePrefix: 'BT' }
+            ],
+            optionalServices: ['1812', '1811', '1801', '180a', '180f']
+        });
 
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+        const services = await server.getPrimaryServices();
+        let characteristic;
+
+        for (const service of services) {
+            const characteristics = await service.getCharacteristics();
+            for (const char of characteristics) {
+                if (char.properties.writeWithoutResponse || char.properties.write) {
+                    characteristic = char;
+                    break;
+                }
+            }
+            if (characteristic) break;
+        }
+
+        if (!characteristic) {
+            throw new Error('Característica de impressão não encontrada');
+        }
+
+        // Armazena a conexão
+        printerConnection = {
+            device: device,
+            server: server,
+            characteristic: characteristic
+        };
+
+        // Adiciona listener para quando a conexão cair
+        device.addEventListener('gattserverdisconnected', async () => {
+            console.log('Conexão Bluetooth perdida, tentando reconectar...');
+            try {
+                await connectPrinter();
+            } catch (error) {
+                console.error('Falha na reconexão automática:', error);
+            }
+        });
 
         return characteristic;
     } catch (error) {
@@ -144,6 +193,15 @@ async function imprimirPedido() {
     }
 
     try {
+        // Verifica se o Bluetooth está disponível
+        const bluetoothAvailable = await checkBluetoothAvailability();
+        if (!bluetoothAvailable) {
+            throw new Error('Bluetooth não está disponível');
+        }
+
+        // Limpa o formulário após validação
+        limparFormulario();
+
         // Conecta à impressora
         const characteristic = await connectPrinter();
 
@@ -167,10 +225,11 @@ async function imprimirPedido() {
             "\x1B\x64\x02";       // Feed 2 lines
 
         // Converte o texto em bytes e envia para a impressora
-        const bytes = textToBytes(textoImpressao);
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(textoImpressao);
         await characteristic.writeValue(bytes);
 
-        // Envia o email usando o serviço da ECTA
+        // Envia o email
         const mensagemEmail = `
 Novo pedido registrado:
 
@@ -185,19 +244,12 @@ Data: ${new Date().toLocaleString()}
         `;
 
         fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
-            .then(response => {
-                console.log("Email enviado com sucesso");
-                limparFormulario();
-            })
-            .catch(error => {
-                console.error("Erro ao enviar email:", error);
-                limparFormulario();
-            });
+            .then(response => console.log("Email enviado com sucesso"))
+            .catch(error => console.error("Erro ao enviar email:", error));
 
     } catch (error) {
         console.error("Erro:", error);
-        alert('Erro ao tentar imprimir. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
-        limparFormulario();
+        alert('Erro ao tentar imprimir. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima');
     }
 }
 

@@ -125,15 +125,15 @@ async function imprimirPedido() {
             "PEDIDO\n" +
             "=================\n\n" +
             "\x1B\x61\x00" +      // Left alignment
-            Nome: ${nome}\n +
-            Telefone: ${telefone}\n\n +
-            Produtos:\n${produtos}\n\n +
-            Forma de Pagamento: ${pagamento}\n +
-            Endereco: ${endereco}\n +
-            Valor Total: ${valor}\n\n +
+            `Nome: ${nome}\n` +
+            `Telefone: ${telefone}\n\n` +
+            `Produtos:\n${produtos}\n\n` +
+            `Forma de Pagamento: ${pagamento}\n` +
+            `Endereco: ${endereco}\n` +
+            `Valor Total: ${valor}\n\n` +
             "\x1B\x61\x01" +      // Center alignment
             "=================\n" +
-            ${new Date().toLocaleString()}\n +
+            `${new Date().toLocaleString()}\n` +
             "\x1B\x64\x02";       // Feed 2 lines
 
         // Converte o texto em bytes e envia para a impressora
@@ -154,7 +154,7 @@ Valor Total: ${valor}
 Data: ${new Date().toLocaleString()}
         `;
 
-        fetch(https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)})
+        fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
             .then(response => {
                 console.log("Email enviado com sucesso");
                 limparFormulario();

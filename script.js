@@ -65,6 +65,17 @@ function resetEstablishmentName() {
     location.reload();
 }
 
+// Função para salvar ID da impressora
+function savePrinterDevice(deviceId) {
+    localStorage.setItem('lastPrinterDevice', deviceId);
+}
+
+// Função para esquecer impressora pareada
+function forgetPrinter() {
+    localStorage.removeItem('lastPrinterDevice');
+    alert('Configuração da impressora removida. Na próxima impressão será necessário parear novamente.');
+}
+
 // Função auxiliar para converter texto em bytes para impressora
 function textToBytes(text) {
     const encoder = new TextEncoder();
@@ -74,16 +85,35 @@ function textToBytes(text) {
 // Função para conectar à impressora
 async function connectPrinter() {
     try {
-        // Procura por dispositivos Bluetooth que pareçam ser impressoras
-        const device = await navigator.bluetooth.requestDevice({
-            filters: [
-                { namePrefix: 'Printer' },
-                { namePrefix: 'ESP' },
-                { namePrefix: 'BT' },
-                { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
-            ],
-            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-        });
+        let device;
+        const lastDeviceId = localStorage.getItem('lastPrinterDevice');
+
+        if (lastDeviceId) {
+            try {
+                // Tenta reconectar ao último dispositivo usado
+                device = await navigator.bluetooth.getDevices()
+                    .then(devices => devices.find(d => d.id === lastDeviceId));
+            } catch (e) {
+                console.log('Não foi possível reconectar automaticamente:', e);
+            }
+        }
+
+        if (!device) {
+            // Se não encontrou dispositivo salvo ou falhou reconexão, solicita novo pareamento
+            device = await navigator.bluetooth.requestDevice({
+                filters: [
+                    { namePrefix: 'Printer' },
+                    { namePrefix: 'ESP' },
+                    { namePrefix: 'BT' },
+                    { namePrefix: 'MTP' },
+                    { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
+                ],
+                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+            });
+            
+            // Salva o ID do novo dispositivo
+            savePrinterDevice(device.id);
+        }
 
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');

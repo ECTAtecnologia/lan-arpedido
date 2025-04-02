@@ -77,12 +77,16 @@ async function connectPrinter() {
     try {
         const device = await navigator.bluetooth.requestDevice({
             filters: [
-                { namePrefix: 'MTP' }
+                { namePrefix: 'MTP' },
+                { namePrefix: 'Printer' },
+                { namePrefix: 'ESP' },
+                { namePrefix: 'BT' }
             ],
             optionalServices: [
                 '49535343-FE7D-4AE5-8FA9-9FAFD205E455',
                 '49535343-8841-43F4-A8D4-ECBE34729BB3',
-                'E7810A71-73AE-499D-8C15-FAA9AEF0C3F2'
+                'E7810A71-73AE-499D-8C15-FAA9AEF0C3F2',
+                '000018f0-0000-1000-8000-00805f9b34fb'
             ]
         });
 
@@ -91,17 +95,31 @@ async function connectPrinter() {
         const server = await device.gatt.connect();
         console.log('Conectado ao servidor GATT');
 
-        // Tenta o primeiro serviço
+        // Tenta diferentes serviços conhecidos
+        let characteristic;
         try {
-            const service = await server.getPrimaryService('49535343-FE7D-4AE5-8FA9-9FAFD205E455');
-            const characteristic = await service.getCharacteristic('49535343-8841-43F4-A8D4-ECBE34729BB3');
-            return characteristic;
-        } catch (e) {
-            console.log('Tentando serviço alternativo...');
-            const service = await server.getPrimaryService('E7810A71-73AE-499D-8C15-FAA9AEF0C3F2');
-            const characteristics = await service.getCharacteristics();
-            return characteristics[0];
+            // Tenta primeiro serviço
+            const service1 = await server.getPrimaryService('49535343-FE7D-4AE5-8FA9-9FAFD205E455');
+            characteristic = await service1.getCharacteristic('49535343-8841-43F4-A8D4-ECBE34729BB3');
+        } catch (e1) {
+            try {
+                // Tenta segundo serviço
+                const service2 = await server.getPrimaryService('E7810A71-73AE-499D-8C15-FAA9AEF0C3F2');
+                const characteristics = await service2.getCharacteristics();
+                characteristic = characteristics[0];
+            } catch (e2) {
+                // Tenta terceiro serviço
+                const service3 = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+                characteristic = await service3.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+            }
         }
+
+        if (!characteristic) {
+            throw new Error('Não foi possível encontrar as características da impressora');
+        }
+
+        return characteristic;
+
     } catch (error) {
         console.error('Erro ao conectar com a impressora:', error);
         throw error;
@@ -161,12 +179,19 @@ async function processarPedidoBackground(dados) {
             "\x1B\x61\x01" +      // Center alignment
             "=================\n" +
             `${dados.data}\n` +
-            "\x1B\x64\x02" +      // Feed 2 lines
-            "\x1D\x56\x41\x00";   // Cut paper
+            "\x1B\x64\x02";       // Feed 2 lines
 
         // Converte o texto em bytes e envia para a impressora
         const bytes = textToBytes(textoImpressao);
-        await characteristic.writeValue(bytes);
+        
+        // Tenta enviar em chunks menores
+        const CHUNK_SIZE = 20;
+        for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+            const chunk = bytes.slice(i, i + CHUNK_SIZE);
+            await characteristic.writeValue(chunk);
+            // Pequeno delay entre os chunks
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
 
         // Envia o email em paralelo
         const mensagemEmail = `
@@ -188,7 +213,7 @@ Data: ${dados.data}
 
     } catch (error) {
         console.error("Erro:", error);
-        alert('Erro ao processar pedido. Por favor, tente novamente.\nVerifique se a impressora está ligada e próxima.');
+        alert('Erro ao processar pedido. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
     }
 }
 

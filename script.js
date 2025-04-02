@@ -25,7 +25,6 @@ window.onload = function() {
     }
 }
 
-// Funções do Modal
 function openModal() {
     document.getElementById('pedidoModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
@@ -66,7 +65,7 @@ function resetEstablishmentName() {
     location.reload();
 }
 
-// Função auxiliar para converter texto em bytes
+// Função auxiliar para converter texto em bytes para impressora
 function textToBytes(text) {
     const encoder = new TextEncoder();
     return encoder.encode(text);
@@ -75,51 +74,22 @@ function textToBytes(text) {
 // Função para conectar à impressora
 async function connectPrinter() {
     try {
+        // Procura por dispositivos Bluetooth que pareçam ser impressoras
         const device = await navigator.bluetooth.requestDevice({
             filters: [
-                { namePrefix: 'MTP' },
                 { namePrefix: 'Printer' },
                 { namePrefix: 'ESP' },
-                { namePrefix: 'BT' }
+                { namePrefix: 'BT' },
+                { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
             ],
-            optionalServices: [
-                '49535343-FE7D-4AE5-8FA9-9FAFD205E455',
-                '49535343-8841-43F4-A8D4-ECBE34729BB3',
-                'E7810A71-73AE-499D-8C15-FAA9AEF0C3F2',
-                '000018f0-0000-1000-8000-00805f9b34fb'
-            ]
+            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
         });
 
-        console.log('Dispositivo encontrado:', device.name);
-
         const server = await device.gatt.connect();
-        console.log('Conectado ao servidor GATT');
-
-        // Tenta diferentes serviços conhecidos
-        let characteristic;
-        try {
-            // Tenta primeiro serviço
-            const service1 = await server.getPrimaryService('49535343-FE7D-4AE5-8FA9-9FAFD205E455');
-            characteristic = await service1.getCharacteristic('49535343-8841-43F4-A8D4-ECBE34729BB3');
-        } catch (e1) {
-            try {
-                // Tenta segundo serviço
-                const service2 = await server.getPrimaryService('E7810A71-73AE-499D-8C15-FAA9AEF0C3F2');
-                const characteristics = await service2.getCharacteristics();
-                characteristic = characteristics[0];
-            } catch (e2) {
-                // Tenta terceiro serviço
-                const service3 = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                characteristic = await service3.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-            }
-        }
-
-        if (!characteristic) {
-            throw new Error('Não foi possível encontrar as características da impressora');
-        }
+        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
         return characteristic;
-
     } catch (error) {
         console.error('Erro ao conectar com a impressora:', error);
         throw error;
@@ -143,77 +113,61 @@ async function imprimirPedido() {
         return;
     }
 
-    // Armazena os dados para uso posterior
-    const dadosPedido = {
-        nome, telefone, produtos, pagamento, endereco, valor, estabelecimento,
-        data: new Date().toLocaleString()
-    };
-
-    // Limpa o formulário imediatamente
-    limparFormulario();
-
-    // Processa impressão e email em background
-    processarPedidoBackground(dadosPedido);
-}
-
-// Função para processar o pedido em background
-async function processarPedidoBackground(dados) {
     try {
-        // Tenta conectar à impressora
+        // Conecta à impressora
         const characteristic = await connectPrinter();
 
         // Formata o texto para impressão
         const textoImpressao = 
             "\x1B\x40" +          // Initialize printer
             "\x1B\x61\x01" +      // Center alignment
-            dados.estabelecimento + "\n\n" +
+            estabelecimento + "\n\n" +
             "PEDIDO\n" +
             "=================\n\n" +
             "\x1B\x61\x00" +      // Left alignment
-            `Nome: ${dados.nome}\n` +
-            `Telefone: ${dados.telefone}\n\n` +
-            `Produtos:\n${dados.produtos}\n\n` +
-            `Forma de Pagamento: ${dados.pagamento}\n` +
-            `Endereco: ${dados.endereco}\n` +
-            `Valor Total: ${dados.valor}\n\n` +
+            Nome: ${nome}\n +
+            Telefone: ${telefone}\n\n +
+            Produtos:\n${produtos}\n\n +
+            Forma de Pagamento: ${pagamento}\n +
+            Endereco: ${endereco}\n +
+            Valor Total: ${valor}\n\n +
             "\x1B\x61\x01" +      // Center alignment
             "=================\n" +
-            `${dados.data}\n` +
+            ${new Date().toLocaleString()}\n +
             "\x1B\x64\x02";       // Feed 2 lines
 
         // Converte o texto em bytes e envia para a impressora
         const bytes = textToBytes(textoImpressao);
-        
-        // Tenta enviar em chunks menores
-        const CHUNK_SIZE = 20;
-        for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-            const chunk = bytes.slice(i, i + CHUNK_SIZE);
-            await characteristic.writeValue(chunk);
-            // Pequeno delay entre os chunks
-            await new Promise(resolve => setTimeout(resolve, 50));
-        }
+        await characteristic.writeValue(bytes);
 
-        // Envia o email em paralelo
+        // Envia o email usando o serviço da ECTA
         const mensagemEmail = `
 Novo pedido registrado:
 
-Estabelecimento: ${dados.estabelecimento}
-Nome do Cliente: ${dados.nome}
-Telefone: ${dados.telefone}
-Produtos: ${dados.produtos}
-Forma de Pagamento: ${dados.pagamento}
-Endereço: ${dados.endereco}
-Valor Total: ${dados.valor}
-Data: ${dados.data}
+Estabelecimento: ${estabelecimento}
+Nome do Cliente: ${nome}
+Telefone: ${telefone}
+Produtos: ${produtos}
+Forma de Pagamento: ${pagamento}
+Endereço: ${endereco}
+Valor Total: ${valor}
+Data: ${new Date().toLocaleString()}
         `;
 
-        fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
-            .then(response => console.log("Email enviado com sucesso"))
-            .catch(error => console.error("Erro ao enviar email:", error));
+        fetch(https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)})
+            .then(response => {
+                console.log("Email enviado com sucesso");
+                limparFormulario();
+            })
+            .catch(error => {
+                console.error("Erro ao enviar email:", error);
+                limparFormulario();
+            });
 
     } catch (error) {
         console.error("Erro:", error);
-        alert('Erro ao processar pedido. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
+        alert('Erro ao tentar imprimir. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
+        limparFormulario();
     }
 }
 

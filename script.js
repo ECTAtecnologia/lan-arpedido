@@ -1,5 +1,3 @@
-// ... existing code ...
-
 function imprimirPedido() {
     // Coleta os dados do formulário
     const nome = document.getElementById('nome').value;
@@ -10,14 +8,14 @@ function imprimirPedido() {
     const valor = document.getElementById('valor').value;
     const estabelecimento = localStorage.getItem('establishmentName') || 'Estabelecimento';
 
-    // Verifica se todos os campos obrigatórios estão preenchidos
+    // Verifica campos obrigatórios
     if (!nome || !produtos || !pagamento || !endereco || !valor) {
         alert('Por favor, preencha todos os campos obrigatórios');
         return;
     }
 
-    // Formata o texto para impressão
-    const textoImpressao = 
+    // Cria conteúdo ESC/POS
+    const textoImpressao =
         "\x1B\x40" +          // Initialize printer
         "\x1B\x61\x01" +      // Center alignment
         estabelecimento + "\n\n" +
@@ -28,31 +26,23 @@ function imprimirPedido() {
         `Telefone: ${telefone}\n\n` +
         `Produtos:\n${produtos}\n\n` +
         `Forma de Pagamento: ${pagamento}\n` +
-        `Endereco: ${endereco}\n` +
+        `Endereço: ${endereco}\n` +
         `Valor Total: ${valor}\n\n` +
         "\x1B\x61\x01" +      // Center alignment
         "=================\n" +
         "\x1B\x64\x02";       // Feed 2 lines
 
-    try {
-        // Conecta ao WebSocket do RawBT
-        const ws = new WebSocket('ws://127.0.0.1:1337/');
-        
-        ws.onopen = function() {
-            // Envia o comando de impressão
-            ws.send(JSON.stringify({
-                type: 'print',
-                content: textoImpressao
-            }));
-        };
+    // Converte ESC/POS para Base64 (com codificação binária segura)
+    const base64 = escposToBase64(textoImpressao);
 
-        ws.onmessage = function(e) {
-            const response = JSON.parse(e.data);
-            if (response.status === 'success') {
-                console.log('Impressão realizada com sucesso');
-                
-                // Envia o email usando o serviço da ECTA
-                const mensagemEmail = `
+    // Monta o link para abrir o RawBT com conteúdo
+    const intentLink = `intent://print/base64/${base64}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end`;
+
+    // Redireciona o navegador para o link (abre RawBT direto)
+    window.location.href = intentLink;
+
+    // Opcional: enviar o email depois
+    const mensagemEmail = `
 Novo pedido registrado:
 
 Estabelecimento: ${estabelecimento}
@@ -63,35 +53,25 @@ Forma de Pagamento: ${pagamento}
 Endereço: ${endereco}
 Valor Total: ${valor}
 Data: ${new Date().toLocaleString()}
-                `;
+    `;
 
-                fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
-                    .then(response => {
-                        console.log("Email enviado com sucesso");
-                        limparFormulario();
-                    })
-                    .catch(error => {
-                        console.error("Erro ao enviar email:", error);
-                        limparFormulario();
-                    });
-            } else {
-                console.error('Erro na impressão:', response.error);
-                alert('Erro ao imprimir. Verifique se a impressora está conectada.');
-            }
-            ws.close();
-        };
-
-        ws.onerror = function(error) {
-            console.error('Erro no WebSocket:', error);
-            alert('Erro ao conectar com a impressora. Verifique se o RawBT está instalado e em execução.');
+    fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
+        .then(response => {
+            console.log("Email enviado com sucesso");
             limparFormulario();
-        };
-
-    } catch (error) {
-        console.error("Erro:", error);
-        alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e em execução.');
-        limparFormulario();
-    }
+        })
+        .catch(error => {
+            console.error("Erro ao enviar email:", error);
+            limparFormulario();
+        });
 }
 
-// ... rest of existing code ...
+// Função auxiliar para converter ESC/POS string para Base64 corretamente
+function escposToBase64(str) {
+    const utf8 = unescape(encodeURIComponent(str));
+    let binary = '';
+    for (let i = 0; i < utf8.length; i++) {
+        binary += String.fromCharCode(utf8.charCodeAt(i));
+    }
+    return btoa(binary);
+}

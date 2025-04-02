@@ -65,7 +65,39 @@ function resetEstablishmentName() {
     location.reload();
 }
 
-function imprimirPedido() {
+// Função auxiliar para converter texto em bytes para impressora
+function textToBytes(text) {
+    const encoder = new TextEncoder();
+    return encoder.encode(text);
+}
+
+// Função para conectar à impressora
+async function connectPrinter() {
+    try {
+        // Procura por dispositivos Bluetooth que pareçam ser impressoras
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [
+                { namePrefix: 'Printer' },
+                { namePrefix: 'ESP' },
+                { namePrefix: 'BT' },
+                { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
+            ],
+            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+        return characteristic;
+    } catch (error) {
+        console.error('Erro ao conectar com a impressora:', error);
+        throw error;
+    }
+}
+
+// Função para imprimir
+async function imprimirPedido() {
     // Coleta os dados do formulário
     const nome = document.getElementById('nome').value;
     const telefone = document.getElementById('telefone').value;
@@ -81,30 +113,32 @@ function imprimirPedido() {
         return;
     }
 
-    // Formata o texto para impressão
-    const textoImpressao = 
-        "\x1B\x40" +          // Initialize printer
-        "\x1B\x61\x01" +      // Center alignment
-        estabelecimento + "\n\n" +
-        "PEDIDO\n" +
-        "=================\n\n" +
-        "\x1B\x61\x00" +      // Left alignment
-        `Nome: ${nome}\n` +
-        `Telefone: ${telefone}\n\n` +
-        `Produtos:\n${produtos}\n\n` +
-        `Forma de Pagamento: ${pagamento}\n` +
-        `Endereco: ${endereco}\n` +
-        `Valor Total: ${valor}\n\n` +
-        "\x1B\x61\x01" +      // Center alignment
-        "=================\n" +
-        "\x1B\x64\x02";       // Feed 2 lines
-
     try {
-        var link = document.createElement('a');
-        link.href = 'rawbt://print?text=' + encodeURIComponent(textoImpressao);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Conecta à impressora
+        const characteristic = await connectPrinter();
+
+        // Formata o texto para impressão
+        const textoImpressao = 
+            "\x1B\x40" +          // Initialize printer
+            "\x1B\x61\x01" +      // Center alignment
+            estabelecimento + "\n\n" +
+            "PEDIDO\n" +
+            "=================\n\n" +
+            "\x1B\x61\x00" +      // Left alignment
+            `Nome: ${nome}\n` +
+            `Telefone: ${telefone}\n\n` +
+            `Produtos:\n${produtos}\n\n` +
+            `Forma de Pagamento: ${pagamento}\n` +
+            `Endereco: ${endereco}\n` +
+            `Valor Total: ${valor}\n\n` +
+            "\x1B\x61\x01" +      // Center alignment
+            "=================\n" +
+            `${new Date().toLocaleString()}\n` +
+            "\x1B\x64\x02";       // Feed 2 lines
+
+        // Converte o texto em bytes e envia para a impressora
+        const bytes = textToBytes(textoImpressao);
+        await characteristic.writeValue(bytes);
 
         // Envia o email usando o serviço da ECTA
         const mensagemEmail = `
@@ -132,6 +166,7 @@ Data: ${new Date().toLocaleString()}
 
     } catch (error) {
         console.error("Erro:", error);
+        alert('Erro ao tentar imprimir. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
         limparFormulario();
     }
 }

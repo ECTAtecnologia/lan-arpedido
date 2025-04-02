@@ -111,60 +111,51 @@ async function connectPrinter() {
 
 // Função para imprimir
 async function imprimirPedido() {
-    // Coleta os dados do formulário
-    const nome = document.getElementById('nome').value;
-    const telefone = document.getElementById('telefone').value;
-    const produtos = document.getElementById('produtos').value;
-    const pagamento = document.getElementById('pagamento').value;
-    const endereco = document.getElementById('endereco').value;
-    const valor = document.getElementById('valor').value;
-    const estabelecimento = localStorage.getItem('establishmentName') || 'Estabelecimento';
-
-    // Verifica se todos os campos obrigatórios estão preenchidos
-    if (!nome || !produtos || !pagamento || !endereco || !valor) {
-        alert('Por favor, preencha todos os campos obrigatórios');
-        return;
-    }
-
-    // Armazena os dados para uso posterior
-    const dadosPedido = {
-        nome, telefone, produtos, pagamento, endereco, valor, estabelecimento,
-        data: new Date().toLocaleString()
-    };
-
-    // Limpa o formulário imediatamente
-    limparFormulario();
-
-    // Processa impressão e email em background
-    processarPedido(dadosPedido).catch(error => {
-        console.error("Erro:", error);
-        alert('Erro ao processar pedido. Verifique a impressora e tente novamente.');
-    });
-}
-
-// Função para processar o pedido em background
-async function processarPedido(dados) {
     try {
-        // Conecta à impressora
+        // Coleta os dados do formulário
+        const nome = document.getElementById('nome').value;
+        const telefone = document.getElementById('telefone').value;
+        const produtos = document.getElementById('produtos').value;
+        const pagamento = document.getElementById('pagamento').value;
+        const endereco = document.getElementById('endereco').value;
+        const valor = document.getElementById('valor').value;
+        const estabelecimento = localStorage.getItem('establishmentName') || 'Estabelecimento';
+
+        // Verifica se todos os campos obrigatórios estão preenchidos
+        if (!nome || !produtos || !pagamento || !endereco || !valor) {
+            alert('Por favor, preencha todos os campos obrigatórios');
+            return;
+        }
+
+        // Primeiro conecta à impressora
         const characteristic = await connectPrinter();
 
-        // Formata o texto para impressão
+        // Armazena os dados para uso posterior
+        const dadosPedido = {
+            nome, telefone, produtos, pagamento, endereco, valor, estabelecimento,
+            data: new Date().toLocaleString()
+        };
+
+        // Agora que temos a conexão com a impressora, podemos limpar o formulário
+        limparFormulario();
+
+        // Formata e envia para impressão
         const textoImpressao = 
             "\x1B\x40" +          // Initialize printer
             "\x1B\x61\x01" +      // Center alignment
-            dados.estabelecimento + "\n\n" +
+            dadosPedido.estabelecimento + "\n\n" +
             "PEDIDO\n" +
             "=================\n\n" +
             "\x1B\x61\x00" +      // Left alignment
-            `Nome: ${dados.nome}\n` +
-            `Telefone: ${dados.telefone}\n\n` +
-            `Produtos:\n${dados.produtos}\n\n` +
-            `Forma de Pagamento: ${dados.pagamento}\n` +
-            `Endereco: ${dados.endereco}\n` +
-            `Valor Total: ${dados.valor}\n\n` +
+            `Nome: ${dadosPedido.nome}\n` +
+            `Telefone: ${dadosPedido.telefone}\n\n` +
+            `Produtos:\n${dadosPedido.produtos}\n\n` +
+            `Forma de Pagamento: ${dadosPedido.pagamento}\n` +
+            `Endereco: ${dadosPedido.endereco}\n` +
+            `Valor Total: ${dadosPedido.valor}\n\n` +
             "\x1B\x61\x01" +      // Center alignment
             "=================\n" +
-            `${dados.data}\n` +
+            `${dadosPedido.data}\n` +
             "\x1B\x64\x02" +      // Feed 2 lines
             "\x1D\x56\x41\x00";   // Cut paper
 
@@ -172,26 +163,21 @@ async function processarPedido(dados) {
         const encoder = new TextEncoder();
         const bytes = encoder.encode(textoImpressao);
         
-        // Tenta enviar em chunks menores
-        const CHUNK_SIZE = 20;
-        for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-            const chunk = bytes.slice(i, i + CHUNK_SIZE);
-            await characteristic.writeValue(chunk);
-            await new Promise(resolve => setTimeout(resolve, 50));
-        }
+        // Envia para a impressora
+        await characteristic.writeValue(bytes);
 
         // Envia o email em paralelo
         const mensagemEmail = `
 Novo pedido registrado:
 
-Estabelecimento: ${dados.estabelecimento}
-Nome do Cliente: ${dados.nome}
-Telefone: ${dados.telefone}
-Produtos: ${dados.produtos}
-Forma de Pagamento: ${dados.pagamento}
-Endereço: ${dados.endereco}
-Valor Total: ${dados.valor}
-Data: ${dados.data}
+Estabelecimento: ${dadosPedido.estabelecimento}
+Nome do Cliente: ${dadosPedido.nome}
+Telefone: ${dadosPedido.telefone}
+Produtos: ${dadosPedido.produtos}
+Forma de Pagamento: ${dadosPedido.pagamento}
+Endereço: ${dadosPedido.endereco}
+Valor Total: ${dadosPedido.valor}
+Data: ${dadosPedido.data}
         `;
 
         fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
@@ -199,7 +185,8 @@ Data: ${dados.data}
             .catch(error => console.error("Erro ao enviar email:", error));
 
     } catch (error) {
-        throw error;
+        console.error("Erro:", error);
+        alert('Erro ao processar pedido. Verifique a impressora e tente novamente.');
     }
 }
 

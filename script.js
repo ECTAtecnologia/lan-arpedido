@@ -3,7 +3,7 @@ window.onload = function() {
     var telefoneInput = document.getElementById('telefone');
     VMasker(telefoneInput).maskPattern('(99) 99999-9999');
 
-    // Máscara para valor em reais (ajustada para números com vírgula)
+    // Máscara para valor em reais
     var valorInput = document.getElementById('valor');
     VMasker(valorInput).maskMoney({
         precision: 2,
@@ -25,7 +25,24 @@ window.onload = function() {
     }
 }
 
-// Função para salvar o nome do estabelecimento
+function openModal() {
+    document.getElementById('pedidoModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+    document.getElementById('pedidoModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// Fecha o modal se clicar fora dele
+window.onclick = function(event) {
+    const modal = document.getElementById('pedidoModal');
+    if (event.target == modal) {
+        closeModal();
+    }
+}
+
 function saveEstablishmentName() {
     const input = document.getElementById('establishment-name');
     const name = input.value.trim();
@@ -43,7 +60,6 @@ function saveEstablishmentName() {
     }
 }
 
-// Função para resetar o nome do estabelecimento
 function resetEstablishmentName() {
     localStorage.removeItem('establishmentName');
     location.reload();
@@ -65,33 +81,33 @@ function imprimirPedido() {
         return;
     }
 
-    // Formata o texto para impressão
-    const textoImpressao = 
-        "\x1B\x40" +          // Initialize printer
-        "\x1B\x61\x01" +      // Center alignment
-        estabelecimento + "\n\n" +
-        "PEDIDO\n" +
-        "=================\n\n" +
-        "\x1B\x61\x00" +      // Left alignment
-        `Nome: ${nome}\n` +
-        `Telefone: ${telefone}\n\n` +
-        `Produtos:\n${produtos}\n\n` +
-        `Forma de Pagamento: ${pagamento}\n` +
-        `Endereco: ${endereco}\n` +
-        `Valor Total: ${valor}\n\n` +
-        "\x1B\x61\x01" +      // Center alignment
-        "=================\n" +
-        "\x1B\x64\x02";       // Feed 2 lines
-
     try {
-        var link = document.createElement('a');
-        link.href = 'rawbt://print?text=' + encodeURIComponent(textoImpressao);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Formata o texto para impressão com comandos ESC/POS
+        const textoImpressao = 
+            '\x1B' + '\x40' +  // Inicializa a impressora
+            '\x1B' + '\x61' + '\x01' +  // Centralizado
+            estabelecimento + '\n\n' +
+            'PEDIDO\n' +
+            '=================\n\n' +
+            '\x1B' + '\x61' + '\x00' +  // Alinhado à esquerda
+            'Nome: ' + nome + '\n' +
+            'Telefone: ' + telefone + '\n\n' +
+            'Produtos:\n' + produtos + '\n\n' +
+            'Forma de Pagamento: ' + pagamento + '\n' +
+            'Endereco: ' + endereco + '\n' +
+            'Valor Total: ' + valor + '\n\n' +
+            '\x1B' + '\x61' + '\x01' +  // Centralizado
+            '=================\n' +
+            new Date().toLocaleString() + '\n' +
+            '\x1B' + '\x64' + '\x02' +  // Avança 2 linhas
+            '\x1B' + '\x69';  // Corta o papel
 
-        // Envia o email usando o serviço da ECTA
-        const mensagemEmail = `
+        // Imprime usando RawBT
+        if (typeof window.RawBT !== 'undefined') {
+            window.RawBT.print(textoImpressao);
+            
+            // Envia o email usando o serviço da ECTA
+            const mensagemEmail = `
 Novo pedido registrado:
 
 Estabelecimento: ${estabelecimento}
@@ -102,21 +118,35 @@ Forma de Pagamento: ${pagamento}
 Endereço: ${endereco}
 Valor Total: ${valor}
 Data: ${new Date().toLocaleString()}
-        `;
+            `;
 
-        fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
-            .then(response => {
-                console.log("Email enviado com sucesso");
+            // Usando XMLHttpRequest para maior compatibilidade
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    console.log("Email enviado com sucesso");
+                    limparFormulario();
+                } else {
+                    console.error("Erro ao enviar email");
+                    limparFormulario();
+                }
+            };
+            
+            xhr.onerror = function() {
+                console.error("Erro ao enviar email");
                 limparFormulario();
-            })
-            .catch(error => {
-                console.error("Erro ao enviar email:", error);
-                limparFormulario();
-            });
+            };
+            
+            xhr.send();
+        } else {
+            throw new Error('RawBT não está disponível');
+        }
 
     } catch (error) {
         console.error("Erro:", error);
-        limparFormulario();
+        alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e configurado corretamente.');
     }
 }
 
@@ -128,4 +158,5 @@ function limparFormulario() {
     document.getElementById('endereco').value = '';
     document.getElementById('valor').value = '';
     document.getElementById('nome').focus();
+    closeModal();
 }

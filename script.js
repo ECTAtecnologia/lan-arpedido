@@ -84,24 +84,18 @@ function imprimirPedido() {
     try {
         // Formata o texto para impressão com comandos ESC/POS
         const textoImpressao = 
-            '\x1B' + '\x40' +  // Inicializa a impressora
-            '\x1B' + '\x61' + '\x01' +  // Centralizado
+            '//print?text=\n' +  // Cabeçalho do RawBT
             estabelecimento + '\n\n' +
             'PEDIDO\n' +
-            '==================\n\n' +
-            '\x1B' + '\x61' + '\x00' +  // Alinhado à esquerda
+            '===================\n\n' +
             'Nome: ' + nome + '\n' +
             'Telefone: ' + telefone + '\n\n' +
             'Produtos:\n' + 
             produtos + '\n\n' +
             'Forma de Pagamento: ' + pagamento + '\n' +
-            'Endereco: ' + endereco + '\n\n' +
+            'Endereco: ' + endereco + '\n' +
             'Valor Total: R$ ' + valor + '\n\n' +
-            '\x1B' + '\x61' + '\x01' +  // Centralizado
-            '==================\n' +
-            new Date().toLocaleString() + '\n' +
-            '\x1B' + '\x64' + '\x02' +  // Avança 2 linhas
-            '\x1B' + '\x69';  // Corta o papel
+            '===================\n';
 
         // Simplificando a chamada do RawBT
         if (typeof window.Android !== 'undefined') {
@@ -111,7 +105,7 @@ function imprimirPedido() {
         } else {
             // Versão Web
             window.location.href = `rawbt:${textoImpressao}`;
-            setTimeout(enviarEmail, 1000); // Aguarda 1 segundo antes de enviar o email
+            setTimeout(enviarEmail, 1000);
         }
 
     } catch (error) {

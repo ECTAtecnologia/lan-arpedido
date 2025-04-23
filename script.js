@@ -1,190 +1,153 @@
-window.onload = function() {
-    // Máscara para telefone
-    var telefoneInput = document.getElementById('telefone');
-    VMasker(telefoneInput).maskPattern('(99) 99999-9999');
+body {
+    background-color: #f8f9fa;
+    font-family: Arial, sans-serif;
+}
 
-    // Máscara para valor em reais
-    var valorInput = document.getElementById('valor');
-    VMasker(valorInput).maskMoney({
-        precision: 2,
-        separator: ',',
-        delimiter: '.',
-        unit: 'R$ '
-    });
+.establishment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
 
-    // Carrega o nome do estabelecimento se existir
-    const savedName = localStorage.getItem('establishmentName');
-    if (savedName) {
-        document.getElementById('establishment-name').value = savedName;
-        document.getElementById('establishment-form').innerHTML = `
-            <div class="establishment-header">
-                <h2 style="font-size: 1rem;">Estabelecimento: ${savedName}</h2>
-                <button onclick="resetEstablishmentName()" class="btn btn-sm btn-secondary" style="font-size: 0.8rem;">Alterar</button>
-            </div>
-        `;
+/* Estilos para o botão flutuante e modal */
+.floating-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    border-radius: 25px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    font-size: 14px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.floating-button:hover {
+    background-color: #45a049;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #f5f5f5;
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: #f5f5f5;
+    padding: 15px;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.establishment-section {
+    text-align: left;
+    margin-bottom: 15px;
+    padding: 5px 0;
+}
+
+.establishment-section h3 {
+    font-size: 16px;
+    margin: 0;
+    color: #333;
+}
+
+.btn-alterar {
+    width: 100%;
+    padding: 8px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    margin-top: 8px;
+    font-size: 14px;
+}
+
+.pedido-container {
+    padding: 10px 0;
+}
+
+.pedido-container h2 {
+    text-align: center;
+    font-size: 20px;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 4px;
+    color: #666;
+    font-size: 14px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    height: auto;
+}
+
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    padding-right: 30px;
+}
+
+.btn-imprimir {
+    width: 100%;
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    margin-top: 15px;
+}
+
+textarea.form-control {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.form-control[type="number"] {
+    -moz-appearance: textfield; /* Remove as setas em Firefox */
+}
+
+.form-control[type="number"]::-webkit-outer-spin-button,
+.form-control[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .modal-content {
+        margin: 0;
+        min-height: 100vh;
     }
-}
-
-function openModal() {
-    document.getElementById('pedidoModal').style.display = 'block';
-    document.body.style.overflow = 'hidden';
-}
-
-function closeModal() {
-    document.getElementById('pedidoModal').style.display = 'none';
-    document.body.style.overflow = 'auto';
-}
-
-// Fecha o modal se clicar fora dele
-window.onclick = function(event) {
-    const modal = document.getElementById('pedidoModal');
-    if (event.target == modal) {
-        closeModal();
-    }
-}
-
-function saveEstablishmentName() {
-    const input = document.getElementById('establishment-name');
-    const name = input.value.trim();
     
-    if (name) {
-        localStorage.setItem('establishmentName', name);
-        document.getElementById('establishment-form').innerHTML = `
-            <div class="establishment-header">
-                <h2 style="font-size: 1rem;">Estabelecimento: ${name}</h2>
-                <button onclick="resetEstablishmentName()" class="btn btn-sm btn-secondary" style="font-size: 0.8rem;">Alterar</button>
-            </div>
-        `;
-    } else {
-        alert('Por favor, digite um nome válido');
+    .form-control {
+        font-size: 16px; /* Previne zoom em iOS */
     }
-}
-
-function resetEstablishmentName() {
-    localStorage.removeItem('establishmentName');
-    location.reload();
-}
-
-function imprimirPedido() {
-    // Coleta os dados do formulário
-    const nome = document.getElementById('nome').value;
-    const telefone = document.getElementById('telefone').value;
-    const produtos = document.getElementById('produtos').value;
-    const pagamento = document.getElementById('pagamento').value;
-    const endereco = document.getElementById('endereco').value;
-    const valor = document.getElementById('valor').value;
-    const estabelecimento = localStorage.getItem('establishmentName') || 'Estabelecimento';
-
-    // Verifica se todos os campos obrigatórios estão preenchidos
-    if (!nome || !produtos || !pagamento || !endereco || !valor) {
-        alert('Por favor, preencha todos os campos obrigatórios');
-        return;
-    }
-
-    try {
-        // Formata o texto para impressão com comandos ESC/POS
-        const textoImpressao = 
-            '\x1B' + '\x40' +  // Inicializa a impressora
-            '\x1B' + '\x61' + '\x01' +  // Centralizado
-            estabelecimento + '\n\n' +
-            'PEDIDO\n' +
-            '=================\n\n' +
-            '\x1B' + '\x61' + '\x00' +  // Alinhado à esquerda
-            'Nome: ' + nome + '\n' +
-            'Telefone: ' + telefone + '\n\n' +
-            'Produtos:\n' + produtos + '\n\n' +
-            'Forma de Pagamento: ' + pagamento + '\n' +
-            'Endereco: ' + endereco + '\n' +
-            'Valor Total: ' + valor + '\n\n' +
-            '\x1B' + '\x61' + '\x01' +  // Centralizado
-            '=================\n' +
-            new Date().toLocaleString() + '\n' +
-            '\x1B' + '\x64' + '\x02' +  // Avança 2 linhas
-            '\x1B' + '\x69';  // Corta o papel
-
-        // Tenta imprimir usando RawBT
-        if (typeof Android !== 'undefined' && Android.print) {
-            // Tenta usar o método do Android
-            Android.print(textoImpressao);
-            limparFormulario();
-        } else if (typeof window.RawBT !== 'undefined') {
-            // Tenta usar o RawBT do navegador
-            window.RawBT.print(textoImpressao, function(success) {
-                if (success) {
-                    enviarEmail();
-                } else {
-                    throw new Error('Falha ao imprimir');
-                }
-            });
-        } else if (typeof RawBT !== 'undefined') {
-            // Tenta usar RawBT global
-            RawBT.print(textoImpressao, function(success) {
-                if (success) {
-                    enviarEmail();
-                } else {
-                    throw new Error('Falha ao imprimir');
-                }
-            });
-        } else {
-            throw new Error('RawBT não está disponível');
-        }
-
-    } catch (error) {
-        console.error("Erro:", error);
-        alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e configurado corretamente.');
-    }
-}
-
-function enviarEmail() {
-    const nome = document.getElementById('nome').value;
-    const telefone = document.getElementById('telefone').value;
-    const produtos = document.getElementById('produtos').value;
-    const pagamento = document.getElementById('pagamento').value;
-    const endereco = document.getElementById('endereco').value;
-    const valor = document.getElementById('valor').value;
-    const estabelecimento = localStorage.getItem('establishmentName') || 'Estabelecimento';
-
-    const mensagemEmail = `
-Novo pedido registrado:
-
-Estabelecimento: ${estabelecimento}
-Nome do Cliente: ${nome}
-Telefone: ${telefone}
-Produtos: ${produtos}
-Forma de Pagamento: ${pagamento}
-Endereço: ${endereco}
-Valor Total: ${valor}
-Data: ${new Date().toLocaleString()}
-    `;
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
-    
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            console.log("Email enviado com sucesso");
-            limparFormulario();
-        } else {
-            console.error("Erro ao enviar email");
-            limparFormulario();
-        }
-    };
-    
-    xhr.onerror = function() {
-        console.error("Erro ao enviar email");
-        limparFormulario();
-    };
-    
-    xhr.send();
-}
-
-function limparFormulario() {
-    document.getElementById('nome').value = '';
-    document.getElementById('telefone').value = '';
-    document.getElementById('produtos').value = '';
-    document.getElementById('pagamento').value = '';
-    document.getElementById('endereco').value = '';
-    document.getElementById('valor').value = '';
-    document.getElementById('nome').focus();
-    closeModal();
 }

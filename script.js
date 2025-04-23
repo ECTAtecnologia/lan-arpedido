@@ -16,13 +16,9 @@ window.onload = function() {
     // Carrega o nome do estabelecimento se existir
     const savedName = localStorage.getItem('establishmentName');
     if (savedName) {
-        document.getElementById('establishment-name').value = savedName;
-        document.getElementById('establishment-form').innerHTML = `
-            <div class="establishment-header">
-                <h2 style="font-size: 1rem;">Estabelecimento: ${savedName}</h2>
-                <button onclick="resetEstablishmentName()" class="btn btn-sm btn-secondary" style="font-size: 0.8rem;">Alterar</button>
-            </div>
-        `;
+        document.getElementById('establishment-display').textContent = savedName;
+    } else {
+        document.getElementById('establishment-form').style.display = 'block';
     }
 }
 
@@ -50,20 +46,17 @@ function saveEstablishmentName() {
     
     if (name) {
         localStorage.setItem('establishmentName', name);
-        document.getElementById('establishment-form').innerHTML = `
-            <div class="establishment-header">
-                <h2 style="font-size: 1rem;">Estabelecimento: ${name}</h2>
-                <button onclick="resetEstablishmentName()" class="btn btn-sm btn-secondary" style="font-size: 0.8rem;">Alterar</button>
-            </div>
-        `;
+        document.getElementById('establishment-display').textContent = name;
+        document.getElementById('establishment-form').style.display = 'none';
     } else {
         alert('Por favor, digite um nome válido');
     }
 }
 
 function resetEstablishmentName() {
-    localStorage.removeItem('establishmentName');
-    location.reload();
+    document.getElementById('establishment-form').style.display = 'block';
+    document.getElementById('establishment-name').value = '';
+    document.getElementById('establishment-name').focus();
 }
 
 function imprimirPedido() {

@@ -113,32 +113,40 @@ async function imprimirPedido() {
         return;
     }
 
+    // Formata o texto para impressão
+    const textoImpressao = 
+        "\x1B\x40" +          // Initialize printer
+        "\x1B\x61\x01" +      // Center alignment
+        estabelecimento + "\n\n" +
+        "PEDIDO\n" +
+        "=================\n\n" +
+        "\x1B\x61\x00" +      // Left alignment
+        `Nome: ${nome}\n` +
+        `Telefone: ${telefone}\n\n` +
+        `Produtos:\n${produtos}\n\n` +
+        `Forma de Pagamento: ${pagamento}\n` +
+        `Endereco: ${endereco}\n` +
+        `Valor Total: ${valor}\n\n` +
+        "\x1B\x61\x01" +      // Center alignment
+        "=================\n" +
+        `${new Date().toLocaleString()}\n` +
+        "\x1B\x64\x02";       // Feed 2 lines
+
     try {
-        // Conecta à impressora
-        const characteristic = await connectPrinter();
-
-        // Formata o texto para impressão
-        const textoImpressao = 
-            "\x1B\x40" +          // Initialize printer
-            "\x1B\x61\x01" +      // Center alignment
-            estabelecimento + "\n\n" +
-            "PEDIDO\n" +
-            "=================\n\n" +
-            "\x1B\x61\x00" +      // Left alignment
-            `Nome: ${nome}\n` +
-            `Telefone: ${telefone}\n\n` +
-            `Produtos:\n${produtos}\n\n` +
-            `Forma de Pagamento: ${pagamento}\n` +
-            `Endereco: ${endereco}\n` +
-            `Valor Total: ${valor}\n\n` +
-            "\x1B\x61\x01" +      // Center alignment
-            "=================\n" +
-            `${new Date().toLocaleString()}\n` +
-            "\x1B\x64\x02";       // Feed 2 lines
-
-        // Converte o texto em bytes e envia para a impressora
-        const bytes = textToBytes(textoImpressao);
-        await characteristic.writeValue(bytes);
+        // Tenta imprimir usando RawBT
+        if (window.RawBT) {
+            window.RawBT.print(textoImpressao);
+        } else {
+            // Fallback para Web Bluetooth se RawBT não estiver disponível
+            try {
+                const characteristic = await connectPrinter();
+                const bytes = textToBytes(textoImpressao);
+                await characteristic.writeValue(bytes);
+            } catch (bluetoothError) {
+                console.error("Erro Bluetooth:", bluetoothError);
+                alert('Não foi possível conectar à impressora via Bluetooth. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
+            }
+        }
 
         // Envia o email usando o serviço da ECTA
         const mensagemEmail = `
@@ -154,19 +162,30 @@ Valor Total: ${valor}
 Data: ${new Date().toLocaleString()}
         `;
 
-        fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
-            .then(response => {
+        // Usando XMLHttpRequest para maior compatibilidade
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
+        
+        xhr.onload = function() {
+            if (xhr.status === 200) {
                 console.log("Email enviado com sucesso");
                 limparFormulario();
-            })
-            .catch(error => {
-                console.error("Erro ao enviar email:", error);
+            } else {
+                console.error("Erro ao enviar email");
                 limparFormulario();
-            });
+            }
+        };
+        
+        xhr.onerror = function() {
+            console.error("Erro ao enviar email");
+            limparFormulario();
+        };
+        
+        xhr.send();
 
     } catch (error) {
         console.error("Erro:", error);
-        alert('Erro ao tentar imprimir. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
+        alert('Erro ao tentar imprimir. Por favor, tente novamente.');
         limparFormulario();
     }
 }

@@ -65,7 +65,6 @@ function resetEstablishmentName() {
     location.reload();
 }
 
-// Função para imprimir
 function imprimirPedido() {
     // Coleta os dados do formulário
     const nome = document.getElementById('nome').value;
@@ -82,36 +81,33 @@ function imprimirPedido() {
         return;
     }
 
-    // Formata o texto para impressão
-    const textoImpressao = 
-        "\x1B\x40" +          // Initialize printer
-        "\x1B\x61\x01" +      // Center alignment
-        estabelecimento + "\n\n" +
-        "PEDIDO\n" +
-        "=================\n\n" +
-        "\x1B\x61\x00" +      // Left alignment
-        `Nome: ${nome}\n` +
-        `Telefone: ${telefone}\n\n` +
-        `Produtos:\n${produtos}\n\n` +
-        `Forma de Pagamento: ${pagamento}\n` +
-        `Endereco: ${endereco}\n` +
-        `Valor Total: ${valor}\n\n` +
-        "\x1B\x61\x01" +      // Center alignment
-        "=================\n" +
-        `${new Date().toLocaleString()}\n` +
-        "\x1B\x64\x02";       // Feed 2 lines
-
     try {
-        // Verifica se o RawBT está disponível
-        if (typeof window.RawBT === 'undefined') {
-            throw new Error('RawBT não está instalado');
-        }
+        // Formata o texto para impressão com comandos ESC/POS
+        const textoImpressao = 
+            '\x1B' + '\x40' +  // Inicializa a impressora
+            '\x1B' + '\x61' + '\x01' +  // Centralizado
+            estabelecimento + '\n\n' +
+            'PEDIDO\n' +
+            '=================\n\n' +
+            '\x1B' + '\x61' + '\x00' +  // Alinhado à esquerda
+            'Nome: ' + nome + '\n' +
+            'Telefone: ' + telefone + '\n\n' +
+            'Produtos:\n' + produtos + '\n\n' +
+            'Forma de Pagamento: ' + pagamento + '\n' +
+            'Endereco: ' + endereco + '\n' +
+            'Valor Total: ' + valor + '\n\n' +
+            '\x1B' + '\x61' + '\x01' +  // Centralizado
+            '=================\n' +
+            new Date().toLocaleString() + '\n' +
+            '\x1B' + '\x64' + '\x02' +  // Avança 2 linhas
+            '\x1B' + '\x69';  // Corta o papel
 
-        // Tenta imprimir usando RawBT
-        window.RawBT.printText(textoImpressao);
-
-        // Envia o email usando o serviço da ECTA
-        const mensagemEmail = `
+        // Imprime usando RawBT
+        if (typeof window.RawBT !== 'undefined') {
+            window.RawBT.print(textoImpressao);
+            
+            // Envia o email usando o serviço da ECTA
+            const mensagemEmail = `
 Novo pedido registrado:
 
 Estabelecimento: ${estabelecimento}
@@ -122,33 +118,35 @@ Forma de Pagamento: ${pagamento}
 Endereço: ${endereco}
 Valor Total: ${valor}
 Data: ${new Date().toLocaleString()}
-        `;
+            `;
 
-        // Usando XMLHttpRequest para maior compatibilidade
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
-        
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                console.log("Email enviado com sucesso");
-                limparFormulario();
-            } else {
+            // Usando XMLHttpRequest para maior compatibilidade
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    console.log("Email enviado com sucesso");
+                    limparFormulario();
+                } else {
+                    console.error("Erro ao enviar email");
+                    limparFormulario();
+                }
+            };
+            
+            xhr.onerror = function() {
                 console.error("Erro ao enviar email");
                 limparFormulario();
-            }
-        };
-        
-        xhr.onerror = function() {
-            console.error("Erro ao enviar email");
-            limparFormulario();
-        };
-        
-        xhr.send();
+            };
+            
+            xhr.send();
+        } else {
+            throw new Error('RawBT não está disponível');
+        }
 
     } catch (error) {
         console.error("Erro:", error);
         alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e configurado corretamente.');
-        limparFormulario();
     }
 }
 

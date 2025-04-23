@@ -82,29 +82,35 @@ function imprimirPedido() {
     }
 
     try {
-        // Formata o texto para impressão com comandos ESC/POS
+        // Formata o texto para impressão usando \r\n para quebra de linha
         const textoImpressao = 
-            '//print?text=\n' +  // Cabeçalho do RawBT
-            estabelecimento + '\n\n' +
-            'PEDIDO\n' +
-            '===================\n\n' +
-            'Nome: ' + nome + '\n' +
-            'Telefone: ' + telefone + '\n\n' +
-            'Produtos:\n' + 
-            produtos + '\n\n' +
-            'Forma de Pagamento: ' + pagamento + '\n' +
-            'Endereco: ' + endereco + '\n' +
-            'Valor Total: R$ ' + valor + '\n\n' +
-            '===================\n';
+            '//print?text=' +
+            estabelecimento + '\r\n' +
+            '\r\n' +
+            'PEDIDO' + '\r\n' +
+            '===================' + '\r\n' +
+            '\r\n' +
+            'Nome: ' + nome + '\r\n' +
+            'Telefone: ' + telefone + '\r\n' +
+            '\r\n' +
+            'Produtos:' + '\r\n' + 
+            produtos + '\r\n' +
+            '\r\n' +
+            'Forma de Pagamento: ' + pagamento + '\r\n' +
+            'Endereco: ' + endereco + '\r\n' +
+            'Valor Total: R$ ' + valor + '\r\n' +
+            '\r\n' +
+            '===================' + '\r\n';
+
+        // Codifica o texto para URL
+        const textoCodeado = encodeURIComponent(textoImpressao);
 
         // Simplificando a chamada do RawBT
         if (typeof window.Android !== 'undefined') {
-            // Versão Android
             window.Android.print(textoImpressao);
             enviarEmail();
         } else {
-            // Versão Web
-            window.location.href = `rawbt:${textoImpressao}`;
+            window.location.href = `rawbt:${textoCodeado}`;
             setTimeout(enviarEmail, 1000);
         }
 

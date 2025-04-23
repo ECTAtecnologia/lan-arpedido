@@ -102,12 +102,49 @@ function imprimirPedido() {
             '\x1B' + '\x64' + '\x02' +  // Avança 2 linhas
             '\x1B' + '\x69';  // Corta o papel
 
-        // Imprime usando RawBT
-        if (typeof window.RawBT !== 'undefined') {
-            window.RawBT.print(textoImpressao);
-            
-            // Envia o email usando o serviço da ECTA
-            const mensagemEmail = `
+        // Tenta imprimir usando RawBT
+        if (typeof Android !== 'undefined' && Android.print) {
+            // Tenta usar o método do Android
+            Android.print(textoImpressao);
+            limparFormulario();
+        } else if (typeof window.RawBT !== 'undefined') {
+            // Tenta usar o RawBT do navegador
+            window.RawBT.print(textoImpressao, function(success) {
+                if (success) {
+                    enviarEmail();
+                } else {
+                    throw new Error('Falha ao imprimir');
+                }
+            });
+        } else if (typeof RawBT !== 'undefined') {
+            // Tenta usar RawBT global
+            RawBT.print(textoImpressao, function(success) {
+                if (success) {
+                    enviarEmail();
+                } else {
+                    throw new Error('Falha ao imprimir');
+                }
+            });
+        } else {
+            throw new Error('RawBT não está disponível');
+        }
+
+    } catch (error) {
+        console.error("Erro:", error);
+        alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e configurado corretamente.');
+    }
+}
+
+function enviarEmail() {
+    const nome = document.getElementById('nome').value;
+    const telefone = document.getElementById('telefone').value;
+    const produtos = document.getElementById('produtos').value;
+    const pagamento = document.getElementById('pagamento').value;
+    const endereco = document.getElementById('endereco').value;
+    const valor = document.getElementById('valor').value;
+    const estabelecimento = localStorage.getItem('establishmentName') || 'Estabelecimento';
+
+    const mensagemEmail = `
 Novo pedido registrado:
 
 Estabelecimento: ${estabelecimento}
@@ -118,36 +155,27 @@ Forma de Pagamento: ${pagamento}
 Endereço: ${endereco}
 Valor Total: ${valor}
 Data: ${new Date().toLocaleString()}
-            `;
+    `;
 
-            // Usando XMLHttpRequest para maior compatibilidade
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
-            
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    console.log("Email enviado com sucesso");
-                    limparFormulario();
-                } else {
-                    console.error("Erro ao enviar email");
-                    limparFormulario();
-                }
-            };
-            
-            xhr.onerror = function() {
-                console.error("Erro ao enviar email");
-                limparFormulario();
-            };
-            
-            xhr.send();
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
+    
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            console.log("Email enviado com sucesso");
+            limparFormulario();
         } else {
-            throw new Error('RawBT não está disponível');
+            console.error("Erro ao enviar email");
+            limparFormulario();
         }
-
-    } catch (error) {
-        console.error("Erro:", error);
-        alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e configurado corretamente.');
-    }
+    };
+    
+    xhr.onerror = function() {
+        console.error("Erro ao enviar email");
+        limparFormulario();
+    };
+    
+    xhr.send();
 }
 
 function limparFormulario() {

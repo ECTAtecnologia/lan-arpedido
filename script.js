@@ -9,7 +9,8 @@ window.onload = function() {
         precision: 2,
         separator: ',',
         delimiter: '.',
-        unit: 'R$ '
+        unit: 'R$ ',
+        zeroCents: true
     });
 
     // Carrega o nome do estabelecimento se existir

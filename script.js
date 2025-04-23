@@ -103,31 +103,15 @@ function imprimirPedido() {
             '\x1B' + '\x64' + '\x02' +  // Avança 2 linhas
             '\x1B' + '\x69';  // Corta o papel
 
-        // Tenta imprimir usando RawBT
-        if (typeof Android !== 'undefined' && Android.print) {
-            // Tenta usar o método do Android
-            Android.print(textoImpressao);
-            limparFormulario();
-        } else if (typeof window.RawBT !== 'undefined') {
-            // Tenta usar o RawBT do navegador
-            window.RawBT.print(textoImpressao, function(success) {
-                if (success) {
-                    enviarEmail();
-                } else {
-                    throw new Error('Falha ao imprimir');
-                }
-            });
-        } else if (typeof RawBT !== 'undefined') {
-            // Tenta usar RawBT global
-            RawBT.print(textoImpressao, function(success) {
-                if (success) {
-                    enviarEmail();
-                } else {
-                    throw new Error('Falha ao imprimir');
-                }
-            });
+        // Simplificando a chamada do RawBT
+        if (typeof window.Android !== 'undefined') {
+            // Versão Android
+            window.Android.print(textoImpressao);
+            enviarEmail();
         } else {
-            throw new Error('RawBT não está disponível');
+            // Versão Web
+            window.location.href = `rawbt:${textoImpressao}`;
+            setTimeout(enviarEmail, 1000); // Aguarda 1 segundo antes de enviar o email
         }
 
     } catch (error) {

@@ -65,39 +65,8 @@ function resetEstablishmentName() {
     location.reload();
 }
 
-// Função auxiliar para converter texto em bytes para impressora
-function textToBytes(text) {
-    const encoder = new TextEncoder();
-    return encoder.encode(text);
-}
-
-// Função para conectar à impressora
-async function connectPrinter() {
-    try {
-        // Procura por dispositivos Bluetooth que pareçam ser impressoras
-        const device = await navigator.bluetooth.requestDevice({
-            filters: [
-                { namePrefix: 'Printer' },
-                { namePrefix: 'ESP' },
-                { namePrefix: 'BT' },
-                { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
-            ],
-            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-        });
-
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-
-        return characteristic;
-    } catch (error) {
-        console.error('Erro ao conectar com a impressora:', error);
-        throw error;
-    }
-}
-
 // Função para imprimir
-async function imprimirPedido() {
+function imprimirPedido() {
     // Coleta os dados do formulário
     const nome = document.getElementById('nome').value;
     const telefone = document.getElementById('telefone').value;
@@ -133,20 +102,13 @@ async function imprimirPedido() {
         "\x1B\x64\x02";       // Feed 2 lines
 
     try {
-        // Tenta imprimir usando RawBT
-        if (window.RawBT) {
-            window.RawBT.print(textoImpressao);
-        } else {
-            // Fallback para Web Bluetooth se RawBT não estiver disponível
-            try {
-                const characteristic = await connectPrinter();
-                const bytes = textToBytes(textoImpressao);
-                await characteristic.writeValue(bytes);
-            } catch (bluetoothError) {
-                console.error("Erro Bluetooth:", bluetoothError);
-                alert('Não foi possível conectar à impressora via Bluetooth. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
-            }
+        // Verifica se o RawBT está disponível
+        if (typeof window.RawBT === 'undefined') {
+            throw new Error('RawBT não está instalado');
         }
+
+        // Tenta imprimir usando RawBT
+        window.RawBT.printText(textoImpressao);
 
         // Envia o email usando o serviço da ECTA
         const mensagemEmail = `
@@ -185,7 +147,7 @@ Data: ${new Date().toLocaleString()}
 
     } catch (error) {
         console.error("Erro:", error);
-        alert('Erro ao tentar imprimir. Por favor, tente novamente.');
+        alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e configurado corretamente.');
         limparFormulario();
     }
 }

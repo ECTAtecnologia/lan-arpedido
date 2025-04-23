@@ -88,22 +88,17 @@ function imprimirPedido() {
             '\x1B' + '\x61' + '\x01' +  // Centralizado
             estabelecimento + '\n\n' +
             'PEDIDO\n' +
-            '=================\n\n' +
+            '==================\n\n' +
             '\x1B' + '\x61' + '\x00' +  // Alinhado à esquerda
-            'Nome:\n' + 
-            nome + '\n\n' +
-            'Telefone:\n' + 
-            telefone + '\n\n' +
+            'Nome: ' + nome + '\n' +
+            'Telefone: ' + telefone + '\n\n' +
             'Produtos:\n' + 
             produtos + '\n\n' +
-            'Forma de Pagamento:\n' + 
-            pagamento + '\n\n' +
-            'Endereco:\n' + 
-            endereco + '\n\n' +
-            'Valor Total:\n' + 
-            valor + '\n\n' +
+            'Forma de Pagamento: ' + pagamento + '\n' +
+            'Endereco: ' + endereco + '\n\n' +
+            'Valor Total: R$ ' + valor + '\n\n' +
             '\x1B' + '\x61' + '\x01' +  // Centralizado
-            '=================\n' +
+            '==================\n' +
             new Date().toLocaleString() + '\n' +
             '\x1B' + '\x64' + '\x02' +  // Avança 2 linhas
             '\x1B' + '\x69';  // Corta o papel

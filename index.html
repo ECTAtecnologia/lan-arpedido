@@ -19,9 +19,12 @@
     <!-- Modal -->
     <div id="pedidoModal" class="modal">
         <div class="modal-content">
-            <span class="close-button" onclick="closeModal()">&times;</span>
-            
-            <div id="establishment-form" class="container mt-4">
+            <div class="establishment-section">
+                <h3>Estabelecimento: <span id="establishment-display">Não definido</span></h3>
+                <button onclick="resetEstablishmentName()" class="btn-alterar">Alterar</button>
+            </div>
+
+            <div id="establishment-form" class="container mt-4" style="display: none;">
                 <div class="mb-3">
                     <label for="establishment-name" class="form-label">Nome do Estabelecimento</label>
                     <div class="input-group">
@@ -31,28 +34,28 @@
                 </div>
             </div>
 
-            <div class="container mt-4">
+            <div class="pedido-container">
                 <h2>Pedido do Cliente</h2>
                 <form id="pedidoForm">
-                    <div class="mb-3">
-                        <label for="nome" class="form-label">Nome do Cliente*</label>
+                    <div class="form-group">
+                        <label for="nome">Nome do Cliente:</label>
                         <input type="text" class="form-control" id="nome" required>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="telefone" class="form-label">Telefone</label>
+                    <div class="form-group">
+                        <label for="telefone">Telefone:</label>
                         <input type="text" class="form-control" id="telefone">
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="produtos" class="form-label">Produtos*</label>
+                    <div class="form-group">
+                        <label for="produtos">Produtos:</label>
                         <textarea class="form-control" id="produtos" rows="3" required></textarea>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="pagamento" class="form-label">Forma de Pagamento*</label>
+                    <div class="form-group">
+                        <label for="pagamento">Forma de Pagamento:</label>
                         <select class="form-control" id="pagamento" required>
-                            <option value="">Selecione...</option>
+                            <option value="">Selecione</option>
                             <option value="Dinheiro">Dinheiro</option>
                             <option value="Cartão de Crédito">Cartão de Crédito</option>
                             <option value="Cartão de Débito">Cartão de Débito</option>
@@ -60,17 +63,17 @@
                         </select>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="endereco" class="form-label">Endereço*</label>
-                        <input type="text" class="form-control" id="endereco" required>
+                    <div class="form-group">
+                        <label for="endereco">Endereço:</label>
+                        <textarea class="form-control" id="endereco" required></textarea>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="valor" class="form-label">Valor Total*</label>
+                    <div class="form-group">
+                        <label for="valor">Valor Total:</label>
                         <input type="text" class="form-control" id="valor" required>
                     </div>
                     
-                    <button type="button" class="btn btn-primary" onclick="imprimirPedido()">Imprimir Pedido</button>
+                    <button type="button" class="btn-imprimir" onclick="imprimirPedido()">Imprimir Pedido</button>
                 </form>
             </div>
         </div>

@@ -1,38 +1,6 @@
 body {
     background-color: #f8f9fa;
-}
-
-.establishment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-/* Estilos para o botão flutuante e modal */
-.floating-button {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 10px 20px;
-    border-radius: 25px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-
-.floating-button:hover {
-    background-color: #0056b3;
-    transform: translateY(-2px);
-    transition: all 0.3s ease;
+    font-family: Arial, sans-serif;
 }
 
 .modal {
@@ -42,39 +10,125 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: #f5f5f5;
     z-index: 1000;
-}
-
-.modal-content {
-    position: relative;
-    background-color: white;
-    margin: 20px auto;
-    padding: 20px;
-    width: 90%;
-    max-width: 600px;
-    border-radius: 8px;
-    max-height: 90vh;
     overflow-y: auto;
 }
 
-.close-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 24px;
-    cursor: pointer;
-    color: #666;
+.modal-content {
+    background-color: #f5f5f5;
+    padding: 20px;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
-.close-button:hover {
+.establishment-section {
+    text-align: left;
+    margin-bottom: 20px;
+    padding: 10px 0;
+}
+
+.establishment-section h3 {
+    font-size: 18px;
+    margin: 0;
     color: #333;
+}
+
+.btn-alterar {
+    width: 100%;
+    padding: 12px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    margin-top: 10px;
+    font-size: 16px;
+}
+
+.pedido-container {
+    padding: 20px 0;
+}
+
+.pedido-container h2 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #666;
+    font-size: 16px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 20px;
+}
+
+.btn-imprimir {
+    width: 100%;
+    padding: 12px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    margin-top: 20px;
+}
+
+/* Botão flutuante */
+.floating-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    border-radius: 25px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    font-size: 14px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.floating-button:hover {
+    background-color: #45a049;
+}
+
+textarea.form-control {
+    min-height: 100px;
+    resize: vertical;
 }
 
 /* Responsividade */
 @media (max-width: 768px) {
     .modal-content {
-        width: 95%;
-        margin: 10px auto;
+        margin: 0;
+        min-height: 100vh;
+    }
+    
+    .form-control {
+        font-size: 16px; /* Previne zoom em iOS */
     }
 }

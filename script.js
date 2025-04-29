@@ -9,33 +9,27 @@ window.onload = function() {
         precision: 2,
         separator: ',',
         delimiter: '.',
-        unit: 'R$ ',
-        zeroCents: true
+        unit: 'R$ '
     });
 
     // Carrega o nome do estabelecimento se existir
     const savedName = localStorage.getItem('establishmentName');
     if (savedName) {
         document.getElementById('establishment-display').textContent = savedName;
+        document.getElementById('establishment-form').style.display = 'none';
     } else {
         document.getElementById('establishment-form').style.display = 'block';
     }
 }
 
 function openModal() {
-    const modal = document.getElementById('pedidoModal');
-    if (modal) {
-        modal.style.display = 'block';
-        document.body.style.overflow = 'hidden';
-    }
+    document.getElementById('pedidoModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-    const modal = document.getElementById('pedidoModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    }
+    document.getElementById('pedidoModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
 }
 
 // Fecha o modal se clicar fora dele
@@ -60,12 +54,45 @@ function saveEstablishmentName() {
 }
 
 function resetEstablishmentName() {
+    localStorage.removeItem('establishmentName');
+    document.getElementById('establishment-display').textContent = 'Não definido';
     document.getElementById('establishment-form').style.display = 'block';
     document.getElementById('establishment-name').value = '';
-    document.getElementById('establishment-name').focus();
 }
 
-function imprimirPedido() {
+// Função auxiliar para converter texto em bytes para impressora
+function textToBytes(text) {
+    const encoder = new TextEncoder();
+    return encoder.encode(text);
+}
+
+// Função para conectar à impressora
+async function connectPrinter() {
+    try {
+        // Procura por dispositivos Bluetooth que pareçam ser impressoras
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [
+                { namePrefix: 'Printer' },
+                { namePrefix: 'ESP' },
+                { namePrefix: 'BT' },
+                { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }
+            ],
+            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+        return characteristic;
+    } catch (error) {
+        console.error('Erro ao conectar com a impressora:', error);
+        throw error;
+    }
+}
+
+// Função para imprimir
+async function imprimirPedido() {
     // Coleta os dados do formulário
     const nome = document.getElementById('nome').value;
     const telefone = document.getElementById('telefone').value;
@@ -82,54 +109,34 @@ function imprimirPedido() {
     }
 
     try {
-        // Formata o texto para impressão usando \r\n para quebra de linha
+        // Conecta à impressora
+        const characteristic = await connectPrinter();
+
+        // Formata o texto para impressão
         const textoImpressao = 
-            '//print?text=' +
-            estabelecimento + '\r\n' +
-            '\r\n' +
-            'PEDIDO' + '\r\n' +
-            '===================' + '\r\n' +
-            '\r\n' +
-            'Nome: ' + nome + '\r\n' +
-            'Telefone: ' + telefone + '\r\n' +
-            '\r\n' +
-            'Produtos:' + '\r\n' + 
-            produtos + '\r\n' +
-            '\r\n' +
-            'Forma de Pagamento: ' + pagamento + '\r\n' +
-            'Endereco: ' + endereco + '\r\n' +
-            'Valor Total: R$ ' + valor + '\r\n' +
-            '\r\n' +
-            '===================' + '\r\n';
+            "\x1B\x40" +          // Initialize printer
+            "\x1B\x61\x01" +      // Center alignment
+            estabelecimento + "\n\n" +
+            "PEDIDO\n" +
+            "=================\n\n" +
+            "\x1B\x61\x00" +      // Left alignment
+            `Nome: ${nome}\n` +
+            `Telefone: ${telefone}\n\n` +
+            `Produtos:\n${produtos}\n\n` +
+            `Forma de Pagamento: ${pagamento}\n` +
+            `Endereco: ${endereco}\n` +
+            `Valor Total: ${valor}\n\n` +
+            "\x1B\x61\x01" +      // Center alignment
+            "=================\n" +
+            `${new Date().toLocaleString()}\n` +
+            "\x1B\x64\x02";       // Feed 2 lines
 
-        // Codifica o texto para URL
-        const textoCodeado = encodeURIComponent(textoImpressao);
+        // Converte o texto em bytes e envia para a impressora
+        const bytes = textToBytes(textoImpressao);
+        await characteristic.writeValue(bytes);
 
-        // Simplificando a chamada do RawBT
-        if (typeof window.Android !== 'undefined') {
-            window.Android.print(textoImpressao);
-            enviarEmail();
-        } else {
-            window.location.href = `rawbt:${textoCodeado}`;
-            setTimeout(enviarEmail, 1000);
-        }
-
-    } catch (error) {
-        console.error("Erro:", error);
-        alert('Erro ao tentar imprimir. Verifique se o RawBT está instalado e configurado corretamente.');
-    }
-}
-
-function enviarEmail() {
-    const nome = document.getElementById('nome').value;
-    const telefone = document.getElementById('telefone').value;
-    const produtos = document.getElementById('produtos').value;
-    const pagamento = document.getElementById('pagamento').value;
-    const endereco = document.getElementById('endereco').value;
-    const valor = document.getElementById('valor').value;
-    const estabelecimento = localStorage.getItem('establishmentName') || 'Estabelecimento';
-
-    const mensagemEmail = `
+        // Envia o email usando o serviço da ECTA
+        const mensagemEmail = `
 Novo pedido registrado:
 
 Estabelecimento: ${estabelecimento}
@@ -140,27 +147,23 @@ Forma de Pagamento: ${pagamento}
 Endereço: ${endereco}
 Valor Total: ${valor}
 Data: ${new Date().toLocaleString()}
-    `;
+        `;
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', `https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`, true);
-    
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            console.log("Email enviado com sucesso");
-            limparFormulario();
-        } else {
-            console.error("Erro ao enviar email");
-            limparFormulario();
-        }
-    };
-    
-    xhr.onerror = function() {
-        console.error("Erro ao enviar email");
+        fetch(`https://portal.ecta.com.br/gerenciamento/EnviarEmailEcta?Assunto=PEDIDO CAIXA CELULAR&Mensagem=${encodeURIComponent(mensagemEmail)}`)
+            .then(response => {
+                console.log("Email enviado com sucesso");
+                limparFormulario();
+            })
+            .catch(error => {
+                console.error("Erro ao enviar email:", error);
+                limparFormulario();
+            });
+
+    } catch (error) {
+        console.error("Erro:", error);
+        alert('Erro ao tentar imprimir. Verifique se:\n1. Bluetooth está ligado\n2. A impressora está ligada e próxima\n3. A impressora está pareada');
         limparFormulario();
-    };
-    
-    xhr.send();
+    }
 }
 
 function limparFormulario() {
